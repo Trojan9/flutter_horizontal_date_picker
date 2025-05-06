@@ -45,6 +45,11 @@ class HorizontalDatePicker extends StatefulWidget {
   final bool needFocus;
   final Curve focusAnimationCurve;
   final Duration focusAnimationDuration;
+  final bool showArrowIcons;
+  final Color? arrowIconColorLeft;
+  final Color? arrowIconColorRight;
+  final VoidCallback? onLeftArrowPressed;
+  final VoidCallback? onRightArrowPressed;
 
   /// * [begin] is the begin DateTime.
   /// * [end] is the end DateTime.
@@ -77,6 +82,11 @@ class HorizontalDatePicker extends StatefulWidget {
     required this.itemCount,
     this.focusAnimationCurve = Curves.elasticOut,
     this.focusAnimationDuration = const Duration(milliseconds: 200),
+    this.showArrowIcons = false,
+    this.arrowIconColorLeft,
+    this.arrowIconColorRight,
+    this.onLeftArrowPressed,
+    this.onRightArrowPressed,
   }) : super(key: key);
 
   @override
@@ -95,9 +105,7 @@ class _HorizontalDatePickerState extends State<HorizontalDatePicker> {
   }
 
   void _checkParameters() {
-    _step = Duration(
-        milliseconds: widget.end.difference(widget.begin).inMilliseconds ~/
-            widget.itemCount);
+    _step = Duration(milliseconds: widget.end.difference(widget.begin).inMilliseconds ~/ widget.itemCount);
     // debugPrint(
     //     '_HorizontalDatePickerState._checkParameters: step=${_step.inMilliseconds}');
   }
@@ -122,56 +130,100 @@ class _HorizontalDatePickerState extends State<HorizontalDatePicker> {
     super.dispose();
   }
 
+  final double _scrollAmount = 100.0;
+
+  void _scrollLeft() {
+    _scrollController.animateTo(
+      _scrollController.offset - _scrollAmount,
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _scrollRight() {
+    _scrollController.animateTo(
+      _scrollController.offset + _scrollAmount,
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       height: widget.itemHeight,
-      child: ListView.builder(
-        controller: _scrollController,
-        scrollDirection: Axis.horizontal,
-        itemBuilder: (context, index) {
-          final itemValue = widget.begin.add(_step * index);
-          final bool isSelected =
-              widget.selected == null ? false : _getSelectedIndex() == index;
-          return FittedBox(
-            child: Container(
-              width: widget.itemWidth,
-              height: widget.itemHeight,
-              margin: EdgeInsets.only(
-                left: index == 0 ? widget.itemSpacing : 0,
-                right: widget.itemSpacing,
-              ),
-              color: isSelected ? widget.selectedColor : widget.unSelectedColor,
-              child: ElevatedButton(
-                onPressed: () {
-                  // debugPrint(
-                  //     '_HorizontalDatePickerState.onPressed: itemValue=$itemValue');
-                  setState(() {
-                    if (widget.onSelected != null)
-                      widget.onSelected!(itemValue);
-                  });
-                },
-                style: ButtonStyle(
-                  shape: MaterialStateProperty.all<OutlinedBorder>(
-                      RoundedRectangleBorder(
-                          // borderRadius: BorderRadius.circular(4),
-                          )),
-                  padding:
-                      MaterialStateProperty.all<EdgeInsets>(EdgeInsets.zero),
-                  elevation: MaterialStateProperty.all<double>(0.0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  backgroundColor:
-                      MaterialStateProperty.all<Color>(Colors.transparent),
-                  overlayColor:
-                      MaterialStateProperty.all<Color>(widget.selectedColor),
-                  minimumSize: MaterialStateProperty.all<Size>(Size.zero),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (widget.showArrowIcons)
+            GestureDetector(
+              onTap: widget.onLeftArrowPressed ?? _scrollLeft,
+              child: SizedBox(
+                width: 20,
+                child: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: widget.arrowIconColorLeft ?? Color(0XFF5D5D5D),
+                  size: 20,
                 ),
-                child: widget.itemBuilder(itemValue, widget.selected),
               ),
             ),
-          );
-        },
-        itemCount: widget.itemCount,
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              itemBuilder: (context, index) {
+                final itemValue = widget.begin.add(_step * index);
+                final bool isSelected = widget.selected == null ? false : _getSelectedIndex() == index;
+                return FittedBox(
+                  child: Container(
+                    width: widget.itemWidth,
+                    height: widget.itemHeight,
+                    margin: EdgeInsets.only(
+                      left: index == 0 ? widget.itemSpacing : 0,
+                      right: widget.itemSpacing,
+                    ),
+                    color: isSelected ? widget.selectedColor : widget.unSelectedColor,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        // debugPrint(
+                        //     '_HorizontalDatePickerState.onPressed: itemValue=$itemValue');
+                        setState(() {
+                          if (widget.onSelected != null) widget.onSelected!(itemValue);
+                        });
+                      },
+                      style: ButtonStyle(
+                        shape: MaterialStateProperty.all<OutlinedBorder>(RoundedRectangleBorder(
+                            // borderRadius: BorderRadius.circular(4),
+                            )),
+                        padding: MaterialStateProperty.all<EdgeInsets>(EdgeInsets.zero),
+                        elevation: MaterialStateProperty.all<double>(0.0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        backgroundColor: MaterialStateProperty.all<Color>(Colors.transparent),
+                        overlayColor: MaterialStateProperty.all<Color>(widget.selectedColor),
+                        minimumSize: MaterialStateProperty.all<Size>(Size.zero),
+                      ),
+                      child: widget.itemBuilder(itemValue, widget.selected),
+                    ),
+                  ),
+                );
+              },
+              itemCount: widget.itemCount,
+            ),
+          ),
+          if (widget.showArrowIcons)
+            GestureDetector(
+              onTap: widget.onRightArrowPressed ?? _scrollRight,
+              child: SizedBox(
+                width: 20,
+                child: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: widget.arrowIconColorRight ?? Color(0XFF5D5D5D),
+                  size: 20,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -181,9 +233,7 @@ class _HorizontalDatePickerState extends State<HorizontalDatePicker> {
     if (widget.selected == null) return result;
     // debugPrint(
     //     '_HorizontalDatePickerState._getSelectedIndex: selected=${widget.selected}');
-    result = (widget.selected!.difference(widget.begin).inMilliseconds /
-            _step.inMilliseconds)
-        .round();
+    result = (widget.selected!.difference(widget.begin).inMilliseconds / _step.inMilliseconds).round();
     return result;
   }
 
@@ -200,16 +250,11 @@ class _HorizontalDatePickerState extends State<HorizontalDatePicker> {
       final double b = (itemW + itemSpacing) * index + itemSpacing;
       double offset = b - a;
 
-      offset = offset
-          .clamp(0.0, _scrollController.position.maxScrollExtent)
-          .toDouble();
-      _scrollController.animateTo(offset,
-          duration: widget.focusAnimationDuration,
-          curve: widget.focusAnimationCurve);
+      offset = offset.clamp(0.0, _scrollController.position.maxScrollExtent).toDouble();
+      _scrollController.animateTo(offset, duration: widget.focusAnimationDuration, curve: widget.focusAnimationCurve);
     } else {
       /// sometime when initializing the scrollController have no client.
-      Future.delayed(Duration(milliseconds: 200))
-          .then((value) => _focusSelected(index));
+      Future.delayed(Duration(milliseconds: 200)).then((value) => _focusSelected(index));
     }
   }
 }
