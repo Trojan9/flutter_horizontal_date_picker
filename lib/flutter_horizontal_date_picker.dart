@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 /// {@tool snippet}
 /// This is a sample of a [HorizontalDatePicker] widget.
@@ -50,6 +51,8 @@ class HorizontalDatePicker extends StatefulWidget {
   final Color? arrowIconColorRight;
   final VoidCallback? onLeftArrowPressed;
   final VoidCallback? onRightArrowPressed;
+  final TextStyle? monthDisplayTextStyle;
+  final double? spaceBetweenMonthAndDatePicker;
 
   /// * [begin] is the begin DateTime.
   /// * [end] is the end DateTime.
@@ -87,6 +90,8 @@ class HorizontalDatePicker extends StatefulWidget {
     this.arrowIconColorRight,
     this.onLeftArrowPressed,
     this.onRightArrowPressed,
+    this.monthDisplayTextStyle,
+    this.spaceBetweenMonthAndDatePicker = 20,
   }) : super(key: key);
 
   @override
@@ -97,10 +102,35 @@ class _HorizontalDatePickerState extends State<HorizontalDatePicker> {
   final _scrollController = ScrollController();
   late Duration _step;
 
+  final itemPositionsListener = ItemPositionsListener.create();
+  late final VoidCallback _positionsListener;
+
+  DateTime monthToDisplay = DateTime.now();
+
   @override
   void initState() {
     _checkParameters();
     _focusSelected(_getSelectedIndex());
+
+    // itemPositionsListener.itemPositions.addListener(() {
+    //   // printIt('itemPositionsListener.itemPositions: ${itemPositionsListener.itemPositions.value}');
+    //   final positions = itemPositionsListener.itemPositions.value.where((pos) => pos.itemLeadingEdge >= 0.0 && pos.itemTrailingEdge <= 1.0).map((pos) => pos.index).toList();
+    //   // printIt('currently visible indices: $positions');
+
+    //   setState(() {
+    //     monthToDisplay = widget.begin.add(Duration(days: positions.first));
+    //   });
+    // });
+
+    _positionsListener = () {
+      final positions = itemPositionsListener.itemPositions.value.where((pos) => pos.itemLeadingEdge < 1.0 && pos.itemTrailingEdge > 0.0).map((pos) => pos.index).toList();
+      // print('currently visible indices: $positions');
+      setState(() {
+        monthToDisplay = widget.begin.add(Duration(days: positions.first));
+      });
+    };
+    itemPositionsListener.itemPositions.addListener(_positionsListener);
+
     super.initState();
   }
 
@@ -127,6 +157,9 @@ class _HorizontalDatePickerState extends State<HorizontalDatePicker> {
   @override
   void dispose() {
     _scrollController.dispose();
+
+    // remove your callback
+    itemPositionsListener.itemPositions.removeListener(_positionsListener);
     super.dispose();
   }
 
@@ -150,81 +183,95 @@ class _HorizontalDatePickerState extends State<HorizontalDatePicker> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: widget.itemHeight,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (widget.showArrowIcons)
-            GestureDetector(
-              onTap: widget.onLeftArrowPressed ?? _scrollLeft,
-              child: SizedBox(
-                width: 20,
-                child: Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: widget.arrowIconColorLeft ?? Color(0XFF5D5D5D),
-                  size: 20,
-                ),
-              ),
-            ),
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              scrollDirection: Axis.horizontal,
-              itemBuilder: (context, index) {
-                final itemValue = widget.begin.add(_step * index);
-                final bool isSelected = widget.selected == null ? false : _getSelectedIndex() == index;
-                return FittedBox(
-                  child: Container(
-                    width: widget.itemWidth,
-                    height: widget.itemHeight,
-                    margin: EdgeInsets.only(
-                      left: index == 0 ? widget.itemSpacing : 0,
-                      right: widget.itemSpacing,
-                    ),
-                    color: isSelected ? widget.selectedColor : widget.unSelectedColor,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // debugPrint(
-                        //     '_HorizontalDatePickerState.onPressed: itemValue=$itemValue');
-                        setState(() {
-                          if (widget.onSelected != null) widget.onSelected!(itemValue);
-                        });
-                      },
-                      style: ButtonStyle(
-                        shape: MaterialStateProperty.all<OutlinedBorder>(RoundedRectangleBorder(
-                            // borderRadius: BorderRadius.circular(4),
-                            )),
-                        padding: MaterialStateProperty.all<EdgeInsets>(EdgeInsets.zero),
-                        elevation: MaterialStateProperty.all<double>(0.0),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        backgroundColor: MaterialStateProperty.all<Color>(Colors.transparent),
-                        overlayColor: MaterialStateProperty.all<Color>(widget.selectedColor),
-                        minimumSize: MaterialStateProperty.all<Size>(Size.zero),
-                      ),
-                      child: widget.itemBuilder(itemValue, widget.selected),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        Text(
+          DateFormat.yMMMM().format(monthToDisplay),
+          style: widget.monthDisplayTextStyle,
+        ),
+        SizedBox(height: widget.spaceBetweenMonthAndDatePicker),
+        SizedBox(
+          height: widget.itemHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (widget.showArrowIcons)
+                GestureDetector(
+                  onTap: widget.onLeftArrowPressed ?? _scrollLeft,
+                  child: SizedBox(
+                    width: 20,
+                    child: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: widget.arrowIconColorLeft ?? Color(0XFF5D5D5D),
+                      size: 20,
                     ),
                   ),
-                );
-              },
-              itemCount: widget.itemCount,
-            ),
-          ),
-          if (widget.showArrowIcons)
-            GestureDetector(
-              onTap: widget.onRightArrowPressed ?? _scrollRight,
-              child: SizedBox(
-                width: 20,
-                child: Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: widget.arrowIconColorRight ?? Color(0XFF5D5D5D),
-                  size: 20,
+                ),
+              Expanded(
+                child: ScrollablePositionedList.builder(
+                  // controller: _scrollController,
+                  itemPositionsListener: itemPositionsListener,
+                  scrollDirection: Axis.horizontal,
+
+                  itemBuilder: (context, index) {
+                    final itemValue = widget.begin.add(_step * index);
+
+                    final bool isSelected = widget.selected == null ? false : _getSelectedIndex() == index;
+                    return FittedBox(
+                      child: Container(
+                        width: widget.itemWidth,
+                        height: widget.itemHeight,
+                        margin: EdgeInsets.only(
+                          left: index == 0 ? widget.itemSpacing : 0,
+                          right: widget.itemSpacing,
+                        ),
+                        color: isSelected ? widget.selectedColor : widget.unSelectedColor,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // debugPrint(
+                            //     '_HorizontalDatePickerState.onPressed: itemValue=$itemValue');
+                            setState(() {
+                              if (widget.onSelected != null) widget.onSelected!(itemValue);
+                            });
+                          },
+                          style: ButtonStyle(
+                            shape: MaterialStateProperty.all<OutlinedBorder>(RoundedRectangleBorder(
+                                // borderRadius: BorderRadius.circular(4),
+                                )),
+                            padding: MaterialStateProperty.all<EdgeInsets>(EdgeInsets.zero),
+                            elevation: MaterialStateProperty.all<double>(0.0),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            backgroundColor: MaterialStateProperty.all<Color>(Colors.transparent),
+                            overlayColor: MaterialStateProperty.all<Color>(widget.selectedColor),
+                            minimumSize: MaterialStateProperty.all<Size>(Size.zero),
+                          ),
+                          child: widget.itemBuilder(itemValue, widget.selected),
+                        ),
+                      ),
+                    );
+                  },
+                  itemCount: widget.itemCount,
                 ),
               ),
-            ),
-        ],
-      ),
+              if (widget.showArrowIcons)
+                GestureDetector(
+                  onTap: widget.onRightArrowPressed ?? _scrollRight,
+                  child: SizedBox(
+                    width: 20,
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: widget.arrowIconColorRight ?? Color(0XFF5D5D5D),
+                      size: 20,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
